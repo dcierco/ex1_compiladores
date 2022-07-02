@@ -27,18 +27,29 @@ prog : { currClass = ClasseID.VarGlobal; } dList main ;
 
 dList : decl dList | ;
 
-decl : type IDENT ';' {  TS_entry nodo = ts.pesquisa($2);
-                            if (nodo != null) 
-                              yyerror("(sem) variavel >" + $2 + "< jah declarada");
-                          else ts.insert(new TS_entry($2, (TS_entry)$1, currClass)); 
-                        }
+decl : type IDENT ';' { TS_entry nodo = ts.pesquisa($2);
+                        if (nodo != null) 
+                        yyerror("(sem) variavel >" + $2 + "< jah declarada");
+                        else ts.insert(new TS_entry($2, (Tipo)$1, currClass)); 
+                      }
+      | type '[' exp ']' IDENT ';' { TS_entry nodo = ts.pesquisa($5);
+                                     if (nodo != null) 
+                                       yyerror("(sem) array >" + $5 + "< jah declarado");
+                                     else if($3 != Tipo.INT){
+                                       yyerror("array precisa ter indices inteiros");
+                                     }
+                                     else{
+                                      ts.insert(new TS_entry($5, (Tipo)$1, currClass));
+                                     }
+                                   }
       ;
               //
               // faria mais sentido reconhecer todos os tipos como ident! 
               // 
-type : INT    { $$ = Tp_INT; }
-     | DOUBLE  { $$ = Tp_DOUBLE; }
-     | BOOL   { $$ = Tp_BOOL; }
+type : INT    { $$ = Tipo.INT; }
+     | DOUBLE  { $$ = Tipo.DOUBLE; }
+     | BOOL   { $$ = Tipo.BOOL; }
+     | STRUCT { $$ = Tipo.STRUCT;} 
      | IDENT  { TS_entry nodo = ts.pesquisa($1);
                 if (nodo == null ) 
                    yyerror("(sem) Nome de tipo <" + $1 + "> nao declarado ");
@@ -58,42 +69,37 @@ listacmd : listacmd cmd
          ;
 
 cmd :  exp ';' 
-      | IF '(' exp ')' cmd   {  if ( ((TS_entry)$3) != Tp_BOOL) 
-                                     yyerror("(sem) expressão (if) deve ser lógica "+((TS_entry)$3).getTipo());
+      | IF '(' exp ')' cmd   {  if ( ((Tipo)$3) != Tipo.BOOL) 
+                                     yyerror("(sem) expressão (if) deve ser lógica "+((Tipo)$3).getTipo());
                              }     
        ;
 
 
-exp : exp '+' exp { $$ = validaTipo('+', (TS_entry)$1, (TS_entry)$3); }
-    | exp '>' exp { $$ = validaTipo('>', (TS_entry)$1, (TS_entry)$3); }
-    | exp AND exp { $$ = validaTipo(AND, (TS_entry)$1, (TS_entry)$3); } 
-    | NUM         { $$ = Tp_INT; }      
+exp : exp '+' exp { $$ = validaTipo('+', (Tipo)$1, (Tipo)$3); }
+    | exp '>' exp { $$ = validaTipo('>', (Tipo)$1, (Tipo)$3); }
+    | exp AND exp { $$ = validaTipo(AND, (Tipo)$1, (Tipo)$3); } 
+    | NUM         { $$ = Tipo.INT; }      
     | '(' exp ')' { $$ = $2; }
     | lvalue   { $$ = $1; }                   
-    | lvalue '=' exp  {  $$ = validaTipo(ATRIB, (TS_entry)$1, (TS_entry)$3);  } 
+    | lvalue '=' exp  {  $$ = validaTipo(ATRIB, (Tipo)$1, (Tipo)$3);  } 
     ;
 
 
 lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
                     if (nodo == null) {
                        yyerror("(sem) var <" + $1 + "> nao declarada"); 
-                       $$ = Tp_ERRO;    
+                       $$ = Tipo.ERRO;    
                        }           
                     else
                         $$ = nodo.getTipo();
                   } 
-       | IDENT '[' exp ']'  { $$ = Tp_ERRO; }
-       | IDENT '.' exp      { $$ = Tp_ERRO; }
+       | IDENT '[' exp ']'  { $$ = Tipo.ERRO; }
+       | IDENT '.' exp      { $$ = Tipo.ERRO; }
 %%
 
   private Yylex lexer;
 
   private TabSimb ts;
-
-  public static TS_entry Tp_INT =  new TS_entry("int", null, ClasseID.TipoBase);
-  public static TS_entry Tp_DOUBLE = new TS_entry("double", null,  ClasseID.TipoBase);
-  public static TS_entry Tp_BOOL = new TS_entry("bool", null,  ClasseID.TipoBase);
-  public static TS_entry Tp_ERRO = new TS_entry("_erro_", null,  ClasseID.TipoBase);
 
   public static final int ARRAY = 1500;
   public static final int ATRIB = 1600;
@@ -124,15 +130,6 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
     lexer = new Yylex(r, this);
 
     ts = new TabSimb();
-
-    //
-    // não me parece que necessitem estar na TS
-    // já que criei todas como public static...
-    //
-    ts.insert(Tp_ERRO);
-    ts.insert(Tp_INT);
-    ts.insert(Tp_DOUBLE);
-    ts.insert(Tp_BOOL);
     
 
   }  
@@ -168,44 +165,44 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
   }
 
 
-   TS_entry validaTipo(int operador, TS_entry A, TS_entry B) {
+   Tipo validaTipo(int operador, Tipo A, Tipo B) {
        
-         switch ( operador ) {
-              case ATRIB:
-                    if ( (A == Tp_INT && B == Tp_INT)                        ||
-                         ((A == Tp_DOUBLE && (B == Tp_INT || B == Tp_DOUBLE))) ||
-                         (A == B) )
-                         return A;
-                     else
-                         yyerror("(sem) tipos incomp. para atribuicao: "+ A.getTipoStr() + " = "+B.getTipoStr());
-                    break;
+  switch ( operador ) {
+    case ATRIB:
+          if ( (A == Tipo.INT && B == Tipo.INT)                        ||
+               (A == Tipo.DOUBLE && (B == Tipo.INT || B == Tipo.DOUBLE)) ||
+               (A == B) )
+               return A;
+           else
+               yyerror("(sem) tipos incomp. para atribuicao: "+ A.getTipo() + " = "+B.getTipo());
+          break;
 
-              case '+' :
-                    if ( A == Tp_INT && B == Tp_INT)
-                          return Tp_INT;
-                    else if ( (A == Tp_DOUBLE && (B == Tp_INT || B == Tp_DOUBLE)) ||
-                                            (B == Tp_DOUBLE && (A == Tp_INT || A == Tp_DOUBLE)) ) 
-                         return Tp_DOUBLE;     
-                    else
-                        yyerror("(sem) tipos incomp. para soma: "+ A.getTipoStr() + " + "+B.getTipoStr());
-                    break;
+    case '+' :
+          if (A == Tipo.INT && B == Tipo.INT)
+                return Tipo.INT;
+          else if (   (A == Tipo.DOUBLE && (B == Tipo.INT || B == Tipo.DOUBLE)) ||
+                      (B == Tipo.DOUBLE && (A == Tipo.INT || A == Tipo.DOUBLE)) ) 
+               return Tipo.DOUBLE;     
+          else
+              yyerror("(sem) tipos incomp. para soma: "+ A.getTipo() + " + "+B.getTipo());
+          break;
 
-             case '>' :
-                     if ((A == Tp_INT || A == Tp_DOUBLE) && (B == Tp_INT || B == Tp_DOUBLE))
-                         return Tp_BOOL;
-                      else
-                        yyerror("(sem) tipos incomp. para op relacional: "+ A.getTipoStr() + " > "+B.getTipoStr());
-                      break;
+   case '>' :
+           if ((A == Tipo.INT || A == Tipo.DOUBLE) && (B == Tipo.INT || B == Tipo.DOUBLE))
+               return Tipo.BOOL;
+            else
+              yyerror("(sem) tipos incomp. para op relacional: "+ A.getTipo() + " > "+B.getTipo());
+            break;
 
-             case AND:
-                     if (A == Tp_BOOL && B == Tp_BOOL)
-                         return Tp_BOOL;
-                      else
-                        yyerror("(sem) tipos incomp. para op lógica: "+ A.getTipoStr() + " && "+B.getTipoStr());
-                 break;
-            }
+   case AND:
+           if (A == Tipo.BOOL && B == Tipo.BOOL)
+               return Tipo.BOOL;
+            else
+              yyerror("(sem) tipos incomp. para op lógica: "+ A.getTipo() + " && "+B.getTipo());
+       break;
+  }
 
-            return Tp_ERRO;
+  return Tipo.ERRO;
            
      }
 

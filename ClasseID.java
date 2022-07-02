@@ -7,4 +7,3 @@
     NomeStruct, 
     CampoStruct; 
   }
-

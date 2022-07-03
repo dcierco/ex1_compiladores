@@ -16,16 +16,15 @@ public class TabFunc
     }    
     
     public void listar() {
-      int cont = 0;  
       System.out.println("\n\nListagem da tabela de funções:\n");
       for (Funcao func : lista) {
-          System.out.println(func);
+          System.out.println(func.toString());
       }
     }
       
     public Funcao pesquisa(String nomeFuncao) {
       for (Funcao func : lista) {
-          if (func.getNome().equals(nomeFuncao)) {
+          if (func.getId().equals(nomeFuncao)) {
 	      return func;
         }
       }

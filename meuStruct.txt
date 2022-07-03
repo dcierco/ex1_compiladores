@@ -1,0 +1,46 @@
+int i;
+
+double x;
+
+bool b;
+
+struct carro {
+    bool x;
+    int valor;
+}
+
+int[10] vint;
+double [20] vdouble;
+bool[30] vbool;
+
+
+void main() {
+    int k;
+   i = 5;
+   
+   i = vint[3];
+
+   i = vint[i];
+    
+   x = vdouble[2] + i;
+
+   b = vbool[i+1] ;
+
+   b = vdouble[ vint[i] + i ] > 5;
+   
+   vint[3] = i;
+
+   vint[i] = 4;
+    
+   vdouble[2] = x + i;
+
+   vbool[i+1] = x > i;
+
+   vbool[ vint[4] + 2 ] = vdouble[ vint[i] + i ] > 5;
+
+
+}
+
+void outraclasse(){
+    int marcelo;
+}

@@ -2,7 +2,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 
-public class TabSimb
+public class TabSimb implements Tabelas
 {
     private ArrayList<TS_entry> lista;
     

@@ -9,13 +9,16 @@ public class Funcao
    private ListaParams listaParams;
 
    // construtor para arrays
-   public Funcao(String id, Tipo tipoRetorno, ListaParams listaParams, String classe) {
+   public Funcao(String id, Tipo tipoRetorno, String classe) {
       this.id = id;
       this.classe = classe;
       this.tipoRetorno = tipoRetorno;
-      this.listaParams = listaParams;
+      this.listaParams = new ListaParams();
    }
 
+   public ListaParams getListaParams(){
+    return this.listaParams;
+   }
 
    public String getId() {
        return id; 
@@ -27,6 +30,20 @@ public class Funcao
    
     
    public String toString() {
-        return "";
-   }
+    StringBuilder aux = new StringBuilder("");
+     
+    aux.append("Id: ");
+    aux.append(String.format("%-10s", this.id));
+
+    aux.append("\tClasse: ");
+    aux.append(classe);
+    aux.append("\tTipo do retorno: "); 
+    aux.append(this.tipoRetorno.getTipo());
+    aux.append("\t\tParametros: ");
+    aux.append(this.listaParams.toString());
+   return aux.toString();
+
+}
+
+}
 

@@ -3,7 +3,8 @@ public enum Tipo {
     DOUBLE("double"), 
     STRUCT("struct"),
     BOOL("bool"),
-    ERRO("_erro_");
+    ERRO("_erro_"),
+    ARRAY("array");
 
     private String tipo;
   

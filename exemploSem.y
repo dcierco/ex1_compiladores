@@ -1,11 +1,12 @@
     
 %{
   import java.io.*;
+  import java.util.*;
 %}
 
 
-%token IDENT, INT, DOUBLE, BOOL, NUM, STRING
-%token LITERAL, AND, VOID, MAIN, IF
+%token IDENT, INT, DOUBLE, BOOL, NUM, STRING, RETURN
+%token LITERAL, AND, VOID, MAIN, IF, DEFINE
 %token STRUCT
 
 %right '='
@@ -13,7 +14,8 @@
 %left '+'
 %left AND
 %left '[' 
-%left '.'  
+%left '.' 
+%left RETURN 
 
 %type <sval> IDENT
 %type <ival> NUM
@@ -23,7 +25,7 @@
 
 %%
 
-prog : { currClass = ClasseID.VarGlobal; } dList main ;
+prog : { currClass = "VarGlobal"; } dList main ;
 
 dList : decl dList | ;
 
@@ -39,9 +41,32 @@ decl : type IDENT ';' { TS_entry nodo = ts.pesquisa($2);
                                        yyerror("array precisa ter indices inteiros");
                                      }
                                      else{
-                                      ts.insert(new TS_entry($5, (Tipo)$1, currClass));
+                                      ts.insert(new TS_entry($5, Tipo.ARRAY, currClass, (Tipo)$1));
                                      }
                                    }
+      | type IDENT {  TS_entry nodo = ts.pesquisa($2);
+                      if (nodo != null) 
+                        yyerror("(sem) struct >" + $2 + "< jah declarado");
+                      else if($1 != Tipo.STRUCT){
+                        yyerror("oops, isso n eh um struct");
+                      }
+                      else{
+                        ts.insert(new TS_entry($2, Tipo.STRUCT, currClass));
+                        ts = ts.pesquisa($2).getTabelaSimb();
+                      }
+                    } 
+                                                                        '{' dList '}' {ts = tabelaSimbolos;}
+      | DEFINE type IDENT { Funcao nodo = tf.pesquisa($3);
+                      if (nodo != null) 
+                        yyerror("(sem) funcao >" + $2 + "< jah declarado");
+                      else{
+                        tf.insert(new Funcao($3, (Tipo)$2, currClass));
+                        ts = tf.pesquisa($3).getListaParams();
+                      }
+                    } 
+                                                                      '(' dList ')' '{' listacmd RETURN exp ';' '}'{ts = tabelaSimbolos;if($2 != $11)
+                                                                          yyerror("Retorno nao eh o mesmo tipo definido na funcao");
+                                                                      }
       ;
               //
               // faria mais sentido reconhecer todos os tipos como ident! 
@@ -49,20 +74,17 @@ decl : type IDENT ';' { TS_entry nodo = ts.pesquisa($2);
 type : INT    { $$ = Tipo.INT; }
      | DOUBLE  { $$ = Tipo.DOUBLE; }
      | BOOL   { $$ = Tipo.BOOL; }
-     | STRUCT { $$ = Tipo.STRUCT;} 
-     | IDENT  { TS_entry nodo = ts.pesquisa($1);
-                if (nodo == null ) 
-                   yyerror("(sem) Nome de tipo <" + $1 + "> nao declarado ");
-                else 
-                    $$ = nodo;
-               } 
+     | STRUCT { $$ = Tipo.STRUCT;}
      ;
 
 
 
-main :  VOID MAIN '(' ')' bloco ;
+main :  VOID MAIN '(' ')' { currClass = "main"; }  bloco 
+      | VOID IDENT '(' ')' { currClass = $2; } bloco
+      |
+;
 
-bloco : '{' listacmd '}';
+bloco : '{' listacmd '}' main;
 
 listacmd : listacmd cmd
         |
@@ -71,7 +93,8 @@ listacmd : listacmd cmd
 cmd :  exp ';' 
       | IF '(' exp ')' cmd   {  if ( ((Tipo)$3) != Tipo.BOOL) 
                                      yyerror("(sem) expressão (if) deve ser lógica "+((Tipo)$3).getTipo());
-                             }     
+                             }  
+      | decl  
        ;
 
 
@@ -93,19 +116,51 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
                     else
                         $$ = nodo.getTipo();
                   } 
-       | IDENT '[' exp ']'  { $$ = Tipo.ERRO; }
-       | IDENT '.' exp      { $$ = Tipo.ERRO; }
+       | IDENT '[' exp ']'  { TS_entry nodo = ts.pesquisa($1);
+                              if (nodo == null) {
+                                yyerror("(sem) var <" + $1 + "> nao declarada"); 
+                                $$ = Tipo.ERRO;    
+                              }           
+                              else
+                                $$ = nodo.getTipoArray();}
+
+       | IDENT '.' IDENT      { TS_entry nodo = ts.pesquisa($1);
+                              if (nodo == null) {
+                                yyerror("(sem) struct <" + $1 + "> nao declarada"); 
+                                $$ = Tipo.ERRO;    
+                              }           
+                              else if(nodo.getTipo() == Tipo.STRUCT){
+                                  nodo = nodo.getTabelaSimb().pesquisa($3);
+                                  if (nodo == null) {
+                                    yyerror("(sem) tipo na struct <" + $3 + "> nao declarada"); 
+                                    $$ = Tipo.ERRO;    
+                                  }           
+                                  else $$ = nodo.getTipo();
+                                }
+                              else $$ = Tipo.ERRO;
+                              }
+       | IDENT'(' lexep ')' {Collections.reverse(listaExec); $$ = validaTipoFunc(tf.pesquisa($1), listaExec); listaExec.clear();}
+       ;
+
+  lexep : exp ',' lexep {listaExec.add((Tipo)$1);}
+        | exp {listaExec.add((Tipo)$1);}
+        |
+        ;
 %%
 
   private Yylex lexer;
 
-  private TabSimb ts;
+  private Tabelas ts;
+  private TabSimb tabelaSimbolos;
+  private TabFunc tf;
+  private String temp;
+  private ArrayList<Tipo> listaExec;
 
   public static final int ARRAY = 1500;
   public static final int ATRIB = 1600;
 
   private String currEscopo;
-  private ClasseID currClass;
+  private String currClass;
 
   private int yylex () {
     int yyl_return = -1;
@@ -129,7 +184,10 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
   public Parser(Reader r) {
     lexer = new Yylex(r, this);
 
-    ts = new TabSimb();
+    tabelaSimbolos = new TabSimb();
+    ts = tabelaSimbolos;
+    tf = new TabFunc();
+    listaExec = new ArrayList<Tipo>();
     
 
   }  
@@ -138,7 +196,8 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
     yydebug = debug;
   }
 
-  public void listarTS() { ts.listar();}
+  public void listarTS() {ts.listar();}
+  public void listarTF() {tf.listar();}
 
   public static void main(String args[]) throws IOException {
     System.out.println("\n\nVerificador semantico simples\n");
@@ -159,11 +218,27 @@ lvalue :  IDENT   { TS_entry nodo = ts.pesquisa($1);
     yyparser.yyparse();
 
       yyparser.listarTS();
+      yyparser.listarTF();
 
       System.out.print("\n\nFeito!\n");
     
   }
 
+    Tipo validaTipoFunc(Funcao funcao, ArrayList<Tipo> listaExec){
+      ArrayList<TS_entry> func = funcao.getListaParams().getLista();
+      ArrayList<Tipo> params = listaExec;
+      if(func.size() != params.size()){
+        yyerror("numero de parametros para execuçao esta incorreto");
+         return Tipo.ERRO;
+      }
+      for(int i = 0; i<func.size(); i++){
+        if(func.get(i).getTipo() != params.get(i)){
+          yyerror("tipo " + i + " que é " + func.get(i).getTipo() + " diferente de " + params.get(i)+ " chamado.");
+          return Tipo.ERRO;
+        }
+      }
+      return funcao.getTipoRetorno();
+    }
 
    Tipo validaTipo(int operador, Tipo A, Tipo B) {
        

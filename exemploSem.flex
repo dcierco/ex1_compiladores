@@ -32,6 +32,7 @@ NL  = \n|\r|\r\n
 /* operators */
 "+" | 
 "=" |
+"," |
 ">" |
 ";" |
 "(" |
@@ -54,6 +55,8 @@ void { return Parser.VOID; }
 main { return Parser.MAIN; }
 if { return Parser.IF; }
 struct { return Parser.STRUCT; }
+define { return Parser.DEFINE; }
+return { return Parser.RETURN; }
 
 
 [a-zA-Z][a-zA-Z_0-9]* { yyparser.yylval = new ParserVal(yytext());
